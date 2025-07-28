@@ -90,7 +90,8 @@ export const sendFinalBundle = async (results: TaskResult[]): Promise<void> => {
 
     const linksPayload: Record<string, string> = {};
     results.forEach((result, index) => {
-        linksPayload[`link${index + 1}`] = result.sourceUrl;
+        // Per user request, send the final Cloudinary image URL as link1, link2, etc.
+        linksPayload[`link${index + 1}`] = result.imageUrl;
     });
 
     const payload = {
