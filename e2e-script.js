@@ -43,33 +43,41 @@ async function sendStatus(level, message = '', details = {}) {
     automationUrl.searchParams.set('password', APP_PASSWORD);
     automationUrl.searchParams.set('action', 'start');
     
-    console.log(`Navigating to automation URL to start the process...`);
+    console.log(`Navigating to automation URL: ${automationUrl.href}`);
     await page.goto(automationUrl.href, { waitUntil: 'networkidle0', timeout: 60000 });
 
     const btnXPath = "//button[contains(., 'START AUTOMATION') or contains(., 'PROCESSING')]";
-    console.log('Waiting for automation process to complete...');
+    console.log('Waiting for automation button to appear...');
     
     // Wait for the button to appear on the page
     await page.waitForSelector(`xpath/${btnXPath}`, { timeout: 60000 });
+    console.log('Button found. Waiting for automation process to complete...');
     
     // Wait for the button to become enabled again, which signifies completion.
     await page.waitForSelector(`xpath/${btnXPath}[not(@disabled)]`, { timeout: 900000 }); // 15 minute timeout
 
     console.log('Automation process has completed.');
+    
+    console.log('Waiting an additional 5 seconds for UI to stabilize...');
+    // Use a standard promise-based timeout
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
-    // Check for errors in the final state by looking for a task with 'Error' status.
-    const hasErrors = await page.evaluate(() => !!document.querySelector('.border-red-500[data-status="Error"]'));
+    // Check for errors in the final state by looking for a task with `data-status="Error"`.
+    // This is more robust than checking for a specific CSS class.
+    const hasErrors = await page.evaluate(() => !!document.querySelector('[data-status="Error"]'));
     if (hasErrors) {
       console.log('Detected errors on one or more tasks.');
       await sendStatus('ERROR', 'Batch completed with errors');
+      // Intentionally do not exit with 1, to allow pipeline to continue if needed,
+      // but the error is logged and sent to webhook.
     } else {
       console.log('Batch completed successfully.');
       await sendStatus('SUCCESS', 'Batch completed successfully');
     }
 
   } catch (err) {
-    console.error('Automation error:', err);
-    await sendStatus('ERROR', err.message, { stack: err.stack });
+    console.error('E2E script automation error:', err);
+    await sendStatus('ERROR', `E2E script failed: ${err.message}`, { stack: err.stack });
     process.exit(1);
   } finally {
     console.log('Closing browser');
