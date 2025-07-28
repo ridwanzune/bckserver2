@@ -1,0 +1,25 @@
+name: Run Dhaka Dispatch Automation
+
+on:
+  schedule:
+    - cron: '0 16 * * *'    # daily @ 6 PM UTC
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Run automation
+        run: node e2e-script.js
+        env:
+          APP_URL:      ${{ secrets.APP_URL }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
