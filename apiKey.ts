@@ -1,5 +1,14 @@
-// WARNING: This file contains a hardcoded API key.
-// This is a major security risk and is strongly discouraged.
-// It is highly recommended to use environment variables instead.
-// Anyone with access to your public repository will be able to see and use this key, potentially incurring costs on your account.
-export const GEMINI_API_KEY = 'AIzaSyBAQLlWJfZWgB6KZBR0I-ytiNpcy6jT5AM';
+// ----------------------------------------------------------------------------------
+// DEPRECATED - This file is no longer in use.
+// ----------------------------------------------------------------------------------
+// The application now uses an environment variable to handle the Gemini API key
+// for better security and to comply with deployment best practices.
+//
+// Please set the `VITE_GEMINI_API` environment variable in your `.env` file for
+// local development or in your Vercel project settings for deployment.
+//
+// Example for a local .env file:
+// VITE_GEMINI_API="your-new-gemini-api-key-here"
+//
+// ----------------------------------------------------------------------------------
+export const GEMINI_API_KEY = 'THIS_IS_DEPRECATED_USE_VITE_GEMINI_API_ENV_VAR';

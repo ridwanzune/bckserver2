@@ -1,7 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
-import { GEMINI_API_KEY } from '../apiKey';
 
-// Initialize the AI client with the hardcoded key
+// In a Vite project, environment variables must be prefixed with VITE_ to be exposed to the client.
+// This key is sourced from the `VITE_GEMINI_API` environment variable.
+// It must be set in your deployment environment (e.g., Vercel) or a local .env file.
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API;
+
+if (!GEMINI_API_KEY) {
+    throw new Error("VITE_GEMINI_API environment variable not set. Please ensure it's defined in your .env file or deployment settings.");
+}
+
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 
