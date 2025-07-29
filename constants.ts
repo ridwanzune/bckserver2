@@ -43,7 +43,7 @@ export const NEWS_CATEGORIES = [
 
 // The delay in milliseconds between fetching news for each category.
 // No longer needed due to the new, more efficient architecture.
-export const API_FETCH_DELAY_MS = 0;
+export const API_FETCH_DELAY_MS = 2000;
 
 
 // URL for the new logo image
