@@ -3,7 +3,6 @@ import puppeteer from 'puppeteer';
 
 const APP_URL = process.env.APP_URL;
 const APP_PASSWORD = process.env.APP_PASSWORD;
-const API_KEY = process.env.API_KEY;
 const WEBHOOK_URL = 'https://hook.eu2.make.com/0ui64t2di3wvvg00fih0d32qp9i9jgme';
 
 async function sendStatus(level, message = '', details = {}) {
@@ -15,11 +14,11 @@ async function sendStatus(level, message = '', details = {}) {
         timestamp: new Date().toISOString(),
         level,
         message,
-        category: 'GitHub Action E2E',
+        category: 'Paka Kotha E2E',
         details
       }),
     });
-    console.log(`Status sent: ${level} - ${message}`);
+    console.log(`Status sent: ${level}`);
   } catch (err) {
     console.error('Webhook send failed:', err);
   }
@@ -32,12 +31,6 @@ async function sendStatus(level, message = '', details = {}) {
     process.exit(1);
   }
 
-  if (!API_KEY) {
-    console.error('API_KEY environment variable is missing.');
-    await sendStatus('ERROR', 'Missing required API_KEY environment variable for E2E test.');
-    process.exit(1);
-  }
-
   console.log('Launching browser...');
   const browser = await puppeteer.launch({
     headless: true,
@@ -46,52 +39,35 @@ async function sendStatus(level, message = '', details = {}) {
   const page = await browser.newPage();
 
   try {
-    const targetUrl = new URL(APP_URL);
-    targetUrl.searchParams.set('apiKey', API_KEY);
-
-    console.log(`Navigating to test URL...`);
-    await page.goto(targetUrl.toString(), { waitUntil: 'networkidle0' });
+    console.log(`Navigating to ${APP_URL} ...`);
+    await page.goto(APP_URL, { waitUntil: 'networkidle0' });
 
     console.log('Entering password...');
     await page.waitForSelector('input[type="password"]', { timeout: 30000 });
     await page.type('input[type="password"]', APP_PASSWORD);
     await page.click('button[type="submit"]');
 
-    const buttonXPath = "//h2[text()='Generate Post Batch']/following-sibling::div/button";
-    console.log('Waiting for the automation button...');
-    await page.waitForSelector(`xpath/${buttonXPath}`, { timeout: 60000 });
+    const btnXPath = "//button[contains(., 'START AUTOMATION')]";
+    console.log('Waiting for START AUTOMATION button...');
+    await page.waitForSelector(`xpath/${btnXPath}`, { timeout: 60000 });
 
-    const [button] = await page.$x(buttonXPath);
-    if (!button) {
-        throw new Error('Automation button not found using XPath.');
-    }
-    
-    console.log('Clicking the automation button...');
-    await button.click();
+    const btn = await page.$(`xpath/${btnXPath}`);
+    if (!btn) throw new Error('START AUTOMATION button not found');
+    await btn.click();
 
-    console.log('Automation started. Waiting for completion (button to be re-enabled)...');
-    // Wait for the button to no longer be disabled. This is more robust than checking for text.
-    await page.waitForFunction(
-      (xpath) => {
-        const buttonElement = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        // The button must exist and not be disabled.
-        return buttonElement && !buttonElement.disabled;
-      },
-      { timeout: 900000 }, // 15 minutes timeout
-      buttonXPath
-    );
-    console.log('Automation process appears to be complete.');
+    console.log('Waiting for completion (button to re-enable)...');
+    await page.waitForSelector(`xpath/${btnXPath}[not(@disabled)]`, { timeout: 900000 });
 
     const hasErrors = await page.evaluate(() => !!document.querySelector('.border-red-500'));
-    console.log(hasErrors ? 'Detected errors during run.' : 'Automation process completed successfully.');
+    console.log(hasErrors ? 'Detected errors' : 'Completed successfully');
 
-    await sendStatus(hasErrors ? 'ERROR' : 'SUCCESS', hasErrors ? 'Batch completed with one or more errors.' : 'Batch completed successfully.');
+    await sendStatus(hasErrors ? 'ERROR' : 'SUCCESS', hasErrors ? 'Batch had errors' : 'Batch completed');
   } catch (err) {
-    console.error('E2E automation script failed:', err);
+    console.error('Automation error:', err);
     await sendStatus('ERROR', err.message, { stack: err.stack });
     process.exit(1);
   } finally {
-    console.log('Closing browser.');
+    console.log('Closing browser');
     await browser.close();
   }
 })();
