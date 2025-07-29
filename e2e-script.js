@@ -18,7 +18,7 @@ async function sendStatus(level, message = '', details = {}) {
         details
       }),
     });
-    console.log(`Status sent: ${level}`);
+    console.log(`Status sent: ${level} - ${message}`);
   } catch (err) {
     console.error('Webhook send failed:', err);
   }
@@ -47,27 +47,41 @@ async function sendStatus(level, message = '', details = {}) {
     await page.type('input[type="password"]', APP_PASSWORD);
     await page.click('button[type="submit"]');
 
-    const btnXPath = "//button[contains(., 'START AUTOMATION')]";
-    console.log('Waiting for START AUTOMATION button...');
-    await page.waitForSelector(`xpath/${btnXPath}`, { timeout: 60000 });
+    const buttonXPath = "//h2[text()='Generate Post Batch']/following-sibling::div/button";
+    console.log('Waiting for the automation button...');
+    await page.waitForSelector(`xpath/${buttonXPath}`, { timeout: 60000 });
 
-    const btn = await page.$(`xpath/${btnXPath}`);
-    if (!btn) throw new Error('START AUTOMATION button not found');
-    await btn.click();
+    const [button] = await page.$x(buttonXPath);
+    if (!button) {
+        throw new Error('Automation button not found using XPath.');
+    }
+    
+    console.log('Clicking the automation button...');
+    await button.click();
 
-    console.log('Waiting for completion (button to re-enable)...');
-    await page.waitForSelector(`xpath/${btnXPath}[not(@disabled)]`, { timeout: 900000 });
+    console.log('Automation started. Waiting for completion (button to be re-enabled)...');
+    // Wait for the button to no longer be disabled. This is more robust than checking for text.
+    await page.waitForFunction(
+      (xpath) => {
+        const buttonElement = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        // The button must exist and not be disabled.
+        return buttonElement && !buttonElement.disabled;
+      },
+      { timeout: 900000 }, // 15 minutes timeout
+      buttonXPath
+    );
+    console.log('Automation process appears to be complete.');
 
     const hasErrors = await page.evaluate(() => !!document.querySelector('.border-red-500'));
-    console.log(hasErrors ? 'Detected errors' : 'Completed successfully');
+    console.log(hasErrors ? 'Detected errors during run.' : 'Automation process completed successfully.');
 
-    await sendStatus(hasErrors ? 'ERROR' : 'SUCCESS', hasErrors ? 'Batch had errors' : 'Batch completed');
+    await sendStatus(hasErrors ? 'ERROR' : 'SUCCESS', hasErrors ? 'Batch completed with one or more errors.' : 'Batch completed successfully.');
   } catch (err) {
-    console.error('Automation error:', err);
+    console.error('E2E automation script failed:', err);
     await sendStatus('ERROR', err.message, { stack: err.stack });
     process.exit(1);
   } finally {
-    console.log('Closing browser');
+    console.log('Closing browser.');
     await browser.close();
   }
 })();
