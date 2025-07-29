@@ -1,15 +1,16 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { selectAndAnalyzeSixBestArticles } from './services/gemini';
 import { fetchAllNewsFromSources } from './services/news';
 import { composeImage, loadImage } from './components/utils/canvas';
-import { LOGO_URL, BRAND_TEXT, OVERLAY_IMAGE_URL, NEWS_CATEGORIES, APP_PASSWORD } from './constants';
+import { LOGO_URL, BRAND_TEXT, OVERLAY_IMAGE_URL, NEWS_CATEGORIES, APP_PASSWORD } from './components/utils/constants';
 import { BatchTask, TaskStatus, WebhookPayload, LogEntry, TaskResult, SelectedArticleAnalysis } from './types';
 import { uploadToCloudinary } from './services/cloudinary';
 import { sendToMakeWebhook, sendStatusUpdate, sendFinalBundle } from './services/webhook';
 import { BatchStatusDisplay } from './components/BatchStatusDisplay';
 import { generateImageFromPrompt } from './services/imageGenerator';
-import { LogPanel } from './components/LogPanel';
+import { LogPanel } from './components/utils/LogPanel';
 import { PasswordScreen } from './components/PasswordScreen';
 
 const App: React.FC = () => {
@@ -76,17 +77,16 @@ const App: React.FC = () => {
         const uniqueCategoryTypes = [...new Set(NEWS_CATEGORIES.map(c => c.type))];
         const allArticles = await fetchAllNewsFromSources(uniqueCategoryTypes);
 
-        if (allArticles.length < 6) {
-            throw new Error(`Failed to gather enough articles. Only found ${allArticles.length}. Need at least 6.`);
-        }
+        // The check for a minimum of 6 articles has been removed to make the process more resilient.
+        // The app will now attempt to process whatever number of articles are successfully gathered.
         log({ level: 'SUCCESS', message: `Successfully gathered ${allArticles.length} unique articles.` });
 
         // --- PHASE 2: SINGLE AI ANALYSIS ---
-        log({ level: 'INFO', message: 'Sending article pool to AI for selection and analysis...' });
+        log({ level: 'INFO', message: `Sending article pool of ${allArticles.length} articles to AI for selection and analysis...` });
         updateTaskStatusForAll(TaskStatus.PROCESSING);
 
         const analyzedResults: SelectedArticleAnalysis[] = await selectAndAnalyzeSixBestArticles(allArticles);
-        log({ level: 'SUCCESS', message: 'AI has selected and analyzed the 6 best articles.' });
+        log({ level: 'SUCCESS', message: `AI has selected and analyzed ${analyzedResults.length} articles.` });
         
         // --- PHASE 3: PROCESS RESULTS ---
         // Map AI results to the original task IDs. This ensures we fill the correct UI slots.
@@ -121,6 +121,7 @@ const App: React.FC = () => {
                 let imageToCompose: HTMLImageElement;
                 try {
                     if (!originalArticle.image_url) throw new Error("Article has no image_url.");
+                    updateTask(taskId, { status: TaskStatus.PROCESSING });
                     imageToCompose = await loadImage(originalArticle.image_url);
                     log({ level: 'INFO', message: 'Article image loaded.', category: categoryName });
                 } catch (error) {

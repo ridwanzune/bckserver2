@@ -1,5 +1,6 @@
+
 import React, { useState, FormEvent } from 'react';
-import { APP_PASSWORD } from '../constants';
+import { APP_PASSWORD } from './utils/constants';
 import { Header } from './Header';
 
 interface PasswordScreenProps {

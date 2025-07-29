@@ -1,4 +1,5 @@
-import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_UPLOAD_PRESET } from '../constants';
+
+import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_UPLOAD_PRESET } from '../components/utils/constants';
 
 /**
  * Uploads a base64 encoded image to Cloudinary using an unsigned upload preset.
@@ -21,6 +22,7 @@ export const uploadToCloudinary = async (base64Image: string): Promise<string> =
 
         if (!response.ok) {
             const errorData = await response.json();
+            // This is a specific error message from the Cloudinary API.
             throw new Error(`Cloudinary upload failed: ${errorData.error.message}`);
         }
 
@@ -33,7 +35,11 @@ export const uploadToCloudinary = async (base64Image: string): Promise<string> =
 
     } catch (error) {
         console.error('Error uploading to Cloudinary:', error);
-        // Re-throw to be caught by the main task handler in App.tsx
-        throw error;
+        // If the error is not already a specific message from the API, wrap it.
+        if (error instanceof Error && error.message.startsWith('Cloudinary upload failed:')) {
+            throw error;
+        }
+        const originalErrorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Cloudinary upload failed during network request: ${originalErrorMessage}`);
     }
 };

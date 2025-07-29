@@ -1,5 +1,6 @@
 
-import { APITUBE_API_KEY, NEWSAPI_ORG_KEY } from '../constants';
+
+import { APITUBE_API_KEY, NEWSAPI_ORG_KEY } from '../components/utils/constants';
 import type { NewsDataArticle } from '../types';
 
 // --- Interfaces for APITube.io (Primary Source) ---
@@ -50,7 +51,9 @@ const fetchFromApiTube = async (categoryType: string): Promise<NewsDataArticle[]
   const commonParams = `limit=10&language.code=en&published_at.after=${twoDaysAgo}`;
 
   switch (categoryType) {
-    case 'bangladesh': queryParams = `everything?countries=BD&${commonParams}`; break;
+    // FIX: Use 'q=Bangladesh' which is a valid parameter, instead of the unsupported 'countries=BD'
+    // for the 'everything' endpoint, which was causing a 400 Bad Request error.
+    case 'bangladesh': queryParams = `everything?q=Bangladesh&${commonParams}`; break;
     case 'world': queryParams = `everything?q=world%20news&${commonParams}`; break;
     case 'geopolitics': queryParams = `everything?q=geopolitics%20OR%20international%20relations&${commonParams}`; break;
     default: return [];

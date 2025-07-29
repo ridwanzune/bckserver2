@@ -1,20 +1,22 @@
 
 /**
  * Asynchronously loads an image from a given URL (which can be a web URL or a base64 data URL).
- * It conditionally sets `crossOrigin` to 'anonymous' to handle images from different domains,
- * which is necessary for drawing them onto a canvas without tainting it.
+ * It routes remote images through a CORS proxy to prevent browser security errors.
  * @param src The URL of the image to load.
  * @returns A Promise that resolves with the loaded HTMLImageElement or rejects on error.
  */
 const loadImage = (src: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+
+    // Use a CORS proxy for all remote http/https images to prevent browser security errors.
+    // Data URLs (like base64 from AI generation) are loaded directly.
+    const PROXY_PREFIX = 'https://corsproxy.io/?';
+    const finalSrc = src.startsWith('http') ? `${PROXY_PREFIX}${encodeURIComponent(src)}` : src;
     
-    // Data URLs don't need CORS and can cause errors with it.
-    // Only apply for remote http/https images.
-    if (src.startsWith('http')) {
-      img.crossOrigin = 'anonymous';
-    }
+    // When using a proxy that correctly sets CORS headers, the crossOrigin attribute is not strictly
+    // necessary, but including it is good practice for signaling intent to the browser.
+    img.crossOrigin = 'anonymous';
 
     img.onload = () => resolve(img);
     
@@ -29,7 +31,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
       }
     };
 
-    img.src = src;
+    img.src = finalSrc;
   });
 };
 

@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SelectedArticleAnalysis, NewsDataArticle } from '../types';
 
@@ -60,11 +61,17 @@ const responseSchema = {
 /**
  * Reviews a large list of news articles and uses a single AI call to select and analyze the 6 best ones.
  * @param articles A large list of potential news articles.
- * @returns A Promise resolving to an array of 6 analyzed articles.
+ * @returns A Promise resolving to an array of up to 6 analyzed articles.
  */
 export const selectAndAnalyzeSixBestArticles = async (
   articles: NewsDataArticle[]
 ): Promise<SelectedArticleAnalysis[]> => {
+    // If there are no articles, return immediately to avoid a pointless API call.
+    if (articles.length === 0) {
+        console.log("No articles provided to AI for analysis. Returning empty array.");
+        return [];
+    }
+    
     const model = 'gemini-2.5-flash';
 
     // We assign a simple index as an ID for each article so the AI can reference it.
@@ -79,15 +86,16 @@ Source: ${article.source_id}
         ).join('\n');
     
     const prompt = `
-You are an expert news editor for a social media channel. Your goal is to curate a batch of 6 top-tier news stories from a large, combined list of recent articles.
+You are an expert news editor for a social media channel. Your goal is to curate a batch of top-tier news stories from a large, combined list of recent articles.
 
 **Your Task:**
 1.  **Review the entire list** of articles provided below.
-2.  **Select exactly 6 articles** that are the most impactful and **recent** (published in the last 48 hours). The distribution must be:
+2.  **Select up to 6 articles** that are the most impactful and **recent** (published in the last 48 hours). Your goal is to achieve the following distribution if possible:
     -   **2 articles** that are most newsworthy, impactful, and socially relevant to a **BANGLADESHI** audience. The article's main subject MUST be Bangladesh.
     -   **2 articles** with the most **GLOBAL** significance, interesting to a wide, international audience.
     -   **2 articles** that are most significant to **GEOPOLITICS**, international relations, or diplomacy.
-3.  For EACH of the 6 articles you select, you must perform a full analysis.
+    If you cannot find 2 good articles for a category, it is okay to select fewer or none for that category. Do your best with the provided list.
+3.  For EACH of the articles you select, you must perform a full analysis.
 
 **Analysis Steps for Each Selected Article:**
 1.  **Headline Generation (IMPACT Principle):** Informative, Main Point, Prompting Curiosity, Active Voice, Concise, Targeted.
@@ -99,7 +107,7 @@ You are an expert news editor for a social media channel. Your goal is to curate
 ${articleListForPrompt}
 
 **Output Instructions:**
-Return a JSON array containing exactly 6 objects, one for each article you selected and analyzed. Adhere strictly to the provided JSON schema.
+Return a JSON array containing objects for each article you selected and analyzed. Adhere strictly to the provided JSON schema. If the list of articles is empty or contains no suitable news, return an empty array.
 `;
 
     try {
@@ -120,18 +128,16 @@ Return a JSON array containing exactly 6 objects, one for each article you selec
 
         const parsedResponse = JSON.parse(responseText);
 
-        if (!Array.isArray(parsedResponse) || parsedResponse.length !== 6) {
-             throw new Error(`AI returned an invalid response. Expected an array of 6 items, but got ${parsedResponse.length} items.`);
+        if (!Array.isArray(parsedResponse)) {
+             throw new Error(`AI returned an invalid response. Expected an array of items, but got a different type.`);
         }
-
+        
+        // The check for exactly 6 items is removed to allow for flexibility.
         return parsedResponse as SelectedArticleAnalysis[];
 
     } catch (error) {
-        let errorMessage = "Failed to analyze the news articles with Gemini.";
-        if (error instanceof Error) {
-            errorMessage = `Gemini analysis failed: ${error.message}`;
-        }
         console.error("Error in selectAndAnalyzeSixBestArticles:", error);
-        throw new Error(errorMessage);
+        const originalErrorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Gemini analysis failed: ${originalErrorMessage}`);
     }
 };

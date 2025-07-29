@@ -1,6 +1,6 @@
 
 
-import { MAKE_WEBHOOK_URL, MAKE_WEBHOOK_AUTH_TOKEN, MAKE_STATUS_WEBHOOK_URL, MAKE_FINAL_BUNDLE_WEBHOOK_URL } from '../constants';
+import { MAKE_WEBHOOK_URL, MAKE_WEBHOOK_AUTH_TOKEN, MAKE_STATUS_WEBHOOK_URL, MAKE_FINAL_BUNDLE_WEBHOOK_URL } from '../components/utils/constants';
 import type { WebhookPayload, StatusWebhookPayload, TaskResult } from '../types';
 
 /**
