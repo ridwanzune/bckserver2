@@ -1,16 +1,17 @@
 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
-import { selectAndAnalyzeSixBestArticles, translateArticlesToEnglish } from './services/gemini';
-import { fetchAllNewsFromSources } from './services/news';
+import { selectAndAnalyzeSixBestArticles, translateArticlesToEnglish } from './components/utils/services/gemini';
+import { fetchAllNewsFromSources } from './components/utils/services/news';
 import { composeImage, loadImage } from './components/utils/canvas';
 import { LOGO_URL, BRAND_TEXT, OVERLAY_IMAGE_URL, NEWS_CATEGORIES, APP_PASSWORD } from './components/utils/constants';
 import { BatchTask, TaskStatus, WebhookPayload, LogEntry, TaskResult, SelectedArticleAnalysis } from './types';
-import { uploadToCloudinary } from './cloudinary';
-import { sendToMakeWebhook, sendStatusUpdate, sendFinalBundle } from './services/webhook';
+import { uploadToCloudinary } from './components/utils/services/cloudinary';
+import { sendToMakeWebhook, sendStatusUpdate, sendFinalBundle } from './components/utils/services/webhook';
 import { BatchStatusDisplay } from './components/BatchStatusDisplay';
-import { generateImageFromPrompt } from './services/imageGenerator';
-import { LogPanel } from './components/utils/LogPanel';
+import { generateImageFromPrompt } from './components/utils/services/imageGenerator';
+import { LogPanel } from './components/LogPanel';
 import { PasswordScreen } from './components/PasswordScreen';
 
 const App: React.FC = () => {
