@@ -1,7 +1,7 @@
 interface ImportMetaEnv {
-  readonly VITE_GEMINI_API: string;
-  readonly VITE_IMAGEN_API_KEY: string;
-  // Add any other environment variables your app uses
+  // Environment variables are now handled via `process.env` to support
+  // the execution environment. VITE_ prefixed variables are no longer used for API keys.
+  // Add any other custom Vite environment variables your app uses here.
 }
 
 interface ImportMeta {

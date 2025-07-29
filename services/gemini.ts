@@ -3,21 +3,33 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SelectedArticleAnalysis, NewsDataArticle } from '../types';
 
-// In a Vite project, environment variables must be prefixed with VITE_ to be exposed to the client.
-// This key is sourced from the `VITE_GEMINI_API` environment variable.
-// It must be set in your deployment environment (e.g., Vercel) or a local .env file.
-const GEMINI_API_KEY = import.meta.env?.VITE_GEMINI_API;
+// The API key is sourced exclusively from the `API_KEY` environment variable.
+// This is required for the AI Studio environment and deployment.
+const GEMINI_API_KEY = process.env.API_KEY;
 
 if (!GEMINI_API_KEY) {
-    const errorMessage = "CRITICAL: Gemini API key is missing. Ensure the `VITE_GEMINI_API` environment variable is set. This can be caused by: 1) The variable not being defined in your .env file or deployment environment. 2) The app not being run through Vite, which is required to expose environment variables.";
+    const errorMessage = "CRITICAL: Gemini API key is missing. Ensure the `API_KEY` environment variable is set.";
     console.error(errorMessage);
     throw new Error(errorMessage);
 }
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-// The schema that defines the structure of the JSON object the AI must return.
-// This makes the AI's output predictable and reliable, removing the need for fragile text parsing.
+// A schema for the AI to return translated article content.
+const translationSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            originalId: { type: Type.INTEGER },
+            translatedTitle: { type: Type.STRING },
+            translatedContent: { type: Type.STRING },
+        },
+        required: ['originalId', 'translatedTitle', 'translatedContent'],
+    },
+};
+
+// The schema that defines the structure of the JSON object the AI must return for analysis.
 const responseSchema = {
     type: Type.ARRAY,
     items: {
@@ -29,7 +41,7 @@ const responseSchema = {
             },
             category: {
                 type: Type.STRING,
-                enum: ['bangladesh', 'world', 'geopolitics'],
+                enum: ['bangladesh_top_stories', 'international_top_stories', 'bangladesh_business_tech', 'bangladesh_culture_people', 'bangladesh_politics'],
                 description: 'The category this article was selected for.',
             },
             headline: {
@@ -51,11 +63,87 @@ const responseSchema = {
             },
             sourceName: {
                 type: Type.STRING,
-                description: "The name of the original news source (e.g., 'thedailystar'). This is a separate, mandatory field.",
+                description: "The name of the original news source (e.g., 'Prothom Alo'). This is a separate, mandatory field.",
             },
         },
         required: ['originalArticleId', 'category', 'headline', 'highlightPhrases', 'imagePrompt', 'caption', 'sourceName'],
     },
+};
+
+/**
+ * Translates a batch of news articles to English using a single Gemini API call.
+ * @param articles An array of articles, some of which may be in Bengali.
+ * @returns A promise that resolves to the same array of articles with content translated to English.
+ */
+export const translateArticlesToEnglish = async (
+  articles: NewsDataArticle[]
+): Promise<NewsDataArticle[]> => {
+    if (articles.length === 0) return [];
+    
+    // Create a list of articles for the prompt, including an ID for re-mapping.
+    const articleListForPrompt = articles
+        .map((article, index) => `
+ARTICLE ${index}:
+ID: ${index}
+Title: ${article.title}
+Content: ${article.content || article.description}
+---`
+        ).join('\n');
+        
+    const prompt = `
+You are an expert translator. Your task is to translate the 'Title' and 'Content' of the following list of news articles into high-quality, fluent English.
+
+**Instructions:**
+1.  Review all articles. Some may not be in English.
+2.  If an article is NOT in English, translate its Title and Content.
+3.  If an article IS ALREADY in English, return its original Title and Content without modification.
+4.  Return a JSON array where each object corresponds to an article from the original list. Maintain the original order.
+
+**List of Articles:**
+${articleListForPrompt}
+
+**Output Format:**
+Return a JSON array that strictly adheres to the provided schema. Each object must contain the original ID, the translated title, and the translated content.
+`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: translationSchema,
+            },
+        });
+        
+        const responseText = response.text?.trim();
+        if (!responseText) {
+            throw new Error("Received an empty text response from the translation API.");
+        }
+
+        const translatedData: { originalId: number; translatedTitle: string; translatedContent: string }[] = JSON.parse(responseText);
+
+        // Create a new array of articles with the translated content.
+        const translatedArticles = [...articles];
+        translatedData.forEach(item => {
+            if (translatedArticles[item.originalId]) {
+                translatedArticles[item.originalId].title = item.translatedTitle;
+                translatedArticles[item.originalId].content = item.translatedContent;
+                // Also update description as it's used as a fallback for content.
+                if (translatedArticles[item.originalId].description) {
+                    translatedArticles[item.originalId].description = item.translatedContent;
+                }
+            }
+        });
+
+        return translatedArticles;
+
+    } catch (error) {
+        console.error("Error during article translation:", error);
+        // On failure, return the original articles to allow the process to continue.
+        // This is a graceful fallback.
+        return articles;
+    }
 };
 
 /**
@@ -86,16 +174,18 @@ Source: ${article.source_id}
         ).join('\n');
     
     const prompt = `
-You are an expert news editor for a social media channel. Your goal is to curate a batch of top-tier news stories from a large, combined list of recent articles.
+You are an expert news editor for a social media channel targeting a Bangladeshi audience. Your goal is to curate a batch of top-tier news stories from a large, combined list of recent articles.
 
 **Your Task:**
-1.  **Review the entire list** of articles provided below.
-2.  **Select up to 6 articles** that are the most impactful and **recent** (published in the last 48 hours). Your goal is to achieve the following distribution if possible:
-    -   **2 articles** that are most newsworthy, impactful, and socially relevant to a **BANGLADESHI** audience. The article's main subject MUST be Bangladesh.
-    -   **2 articles** with the most **GLOBAL** significance, interesting to a wide, international audience.
-    -   **2 articles** that are most significant to **GEOPOLITICS**, international relations, or diplomacy.
-    If you cannot find 2 good articles for a category, it is okay to select fewer or none for that category. Do your best with the provided list.
-3.  For EACH of the articles you select, you must perform a full analysis.
+1.  **Review the entire list** of articles provided below. The articles have been sourced from queries on specific topics, many from local Bengali news outlets. They have been translated to English for your review.
+2.  **Select exactly 6 articles** that are the most impactful and **recent**. You MUST fulfill the following distribution, prioritizing articles from local Bangladeshi sources (like Prothom Alo, bdnews24, etc.) for local categories:
+    -   **2 articles** for 'bangladesh_top_stories': Must be the two most significant **NATIONAL** stories from **BANGLADESH**. These should be the most important, timely general news for the country.
+    -   **1 article** for 'international_top_stories': Must have **GLOBAL** significance from a top-tier international source (like BBC, Al Jazeera).
+    -   **1 article** for 'bangladesh_business_tech': Must be a significant story about **Business, Economy, or Technology** in Bangladesh.
+    -   **1 article** for 'bangladesh_politics': Must be a significant and recent story about **Politics or Elections** in Bangladesh.
+    -   **1 article** for 'bangladesh_culture_people': Must be a compelling story about **Culture, Arts, Human Interest, or a notable Person** in Bangladesh.
+    If you cannot find a suitable article for a category from the provided list, you MUST still try your best to find the closest match. Do not leave a category empty.
+3.  For EACH of the 6 articles you select, you must perform a full analysis.
 
 **Analysis Steps for Each Selected Article:**
 1.  **Headline Generation (IMPACT Principle):** Informative, Main Point, Prompting Curiosity, Active Voice, Concise, Targeted.
@@ -107,7 +197,7 @@ You are an expert news editor for a social media channel. Your goal is to curate
 ${articleListForPrompt}
 
 **Output Instructions:**
-Return a JSON array containing objects for each article you selected and analyzed. Adhere strictly to the provided JSON schema. If the list of articles is empty or contains no suitable news, return an empty array.
+Return a JSON array containing exactly 6 objects for each article you selected and analyzed. Adhere strictly to the provided JSON schema.
 `;
 
     try {

@@ -29,16 +29,50 @@ export const MAKE_STATUS_WEBHOOK_URL = 'https://hook.eu2.make.com/0ui64t2di3wvvg
 export const MAKE_FINAL_BUNDLE_WEBHOOK_URL = 'https://hook.eu2.make.com/iynaiqae3cig9urc9klykd3oj2tb9prq';
 
 
-// --- NEW: NEWS CATEGORIES FOR BATCH PROCESSING ---
-// Defines the 6 content pieces to be generated in each run.
-// 'type' is used to determine which API endpoint to call.
+// --- REFINED: TOPIC-BASED NEWS FETCHING CONFIGURATION ---
+// This defines more focused queries to gather a higher-quality pool of articles.
+// Local news for Bangladesh is fetched in Bengali ('bn') from top-tier local sites.
+const BANGLA_NEWS_SITES_FOR_NEWSAPI = 'prothomalo.com,bdnews24.com,kalerkantho.com';
+const BANGLA_NEWS_SITES_QUERY_FOR_APITUBE = '(site:prothomalo.com OR site:bdnews24.com OR site:kalerkantho.com)';
+
+export const NEWS_TOPICS = [
+  {
+    type: 'bangladesh_top_stories',
+    newsapi: { endpoint: 'everything', params: { domains: BANGLA_NEWS_SITES_FOR_NEWSAPI, q: 'Bangladesh', sortBy: 'publishedAt', pageSize: '20' } },
+    apitube: { q: `(বাংলাদেশ OR "জাতীয় খবর") AND ${BANGLA_NEWS_SITES_QUERY_FOR_APITUBE}`, limit: '20', lang: 'bn' }
+  },
+  {
+    type: 'international_top_stories',
+    newsapi: { endpoint: 'top-headlines', params: { sources: 'bbc-news,al-jazeera-english', pageSize: '15' } },
+    apitube: { q: 'world headlines OR international news', limit: '15', lang: 'en' }
+  },
+  {
+    type: 'bangladesh_business_tech',
+    newsapi: { endpoint: 'everything', params: { domains: BANGLA_NEWS_SITES_FOR_NEWSAPI, q: 'business OR technology', sortBy: 'publishedAt', pageSize: '10' } },
+    apitube: { q: `(ব্যবসা OR অর্থনীতি OR প্রযুক্তি) AND ${BANGLA_NEWS_SITES_QUERY_FOR_APITUBE}`, limit: '10', lang: 'bn' }
+  },
+  {
+    type: 'bangladesh_politics',
+    newsapi: { endpoint: 'everything', params: { domains: BANGLA_NEWS_SITES_FOR_NEWSAPI, q: 'politics', sortBy: 'publishedAt', pageSize: '10' } },
+    apitube: { q: `(রাজনীতি OR নির্বাচন) AND ${BANGLA_NEWS_SITES_QUERY_FOR_APITUBE}`, limit: '10', lang: 'bn' }
+  },
+    {
+    type: 'bangladesh_culture_people',
+    newsapi: { endpoint: 'everything', params: { domains: BANGLA_NEWS_SITES_FOR_NEWSAPI, q: 'culture OR entertainment OR people', sortBy: 'publishedAt', pageSize: '10' } },
+    apitube: { q: `(সংস্কৃতি OR বিনোদন OR সমাজ) AND ${BANGLA_NEWS_SITES_QUERY_FOR_APITUBE}`, limit: '10', lang: 'bn' }
+  }
+];
+
+
+// --- REFINED: NEWS CATEGORIES FOR BATCH PROCESSING ---
+// Defines the 6 content pieces to be generated in each run, mapping them to the refined topic types above.
 export const NEWS_CATEGORIES = [
-  { id: 'bd_trending_1', name: 'Bangladesh Trending 1', type: 'bangladesh' },
-  { id: 'bd_trending_2', name: 'Bangladesh Trending 2', type: 'bangladesh' },
-  { id: 'world_trending_1', name: 'World Trending 1', type: 'world' },
-  { id: 'world_trending_2', name: 'World Trending 2', type: 'world' },
-  { id: 'geopolitics_1', name: 'Geopolitics 1', type: 'geopolitics' },
-  { id: 'geopolitics_2', name: 'Geopolitics 2', type: 'geopolitics' },
+  { id: 'nat_1', name: 'Top National Story', type: 'bangladesh_top_stories' },
+  { id: 'nat_2', name: 'Second National Story', type: 'bangladesh_top_stories' },
+  { id: 'intl_1', name: 'Top International Story', type: 'international_top_stories' },
+  { id: 'biz_1', name: 'Bangladesh Business/Tech', type: 'bangladesh_business_tech' },
+  { id: 'cul_1', name: 'Bangladesh Culture/People', type: 'bangladesh_culture_people' },
+  { id: 'pol_1', name: 'Bangladesh Politics', type: 'bangladesh_politics' },
 ];
 
 // The delay in milliseconds between fetching news for each category.

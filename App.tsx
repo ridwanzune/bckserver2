@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
-import { selectAndAnalyzeSixBestArticles } from './services/gemini';
+import { selectAndAnalyzeSixBestArticles, translateArticlesToEnglish } from './services/gemini';
 import { fetchAllNewsFromSources } from './services/news';
 import { composeImage, loadImage } from './components/utils/canvas';
 import { LOGO_URL, BRAND_TEXT, OVERLAY_IMAGE_URL, NEWS_CATEGORIES, APP_PASSWORD } from './components/utils/constants';
@@ -74,18 +74,20 @@ const App: React.FC = () => {
         log({ level: 'INFO', message: 'Gathering a large pool of articles from all sources...' });
         updateTaskStatusForAll(TaskStatus.GATHERING);
         
-        const uniqueCategoryTypes = [...new Set(NEWS_CATEGORIES.map(c => c.type))];
-        const allArticles = await fetchAllNewsFromSources(uniqueCategoryTypes);
-
-        // The check for a minimum of 6 articles has been removed to make the process more resilient.
-        // The app will now attempt to process whatever number of articles are successfully gathered.
+        const allArticles = await fetchAllNewsFromSources();
         log({ level: 'SUCCESS', message: `Successfully gathered ${allArticles.length} unique articles.` });
 
+        // --- NEW PHASE 1.5: TRANSLATE ARTICLES ---
+        log({ level: 'INFO', message: 'Translating articles to English for consistent analysis...' });
+        const translatedArticles = await translateArticlesToEnglish(allArticles);
+        log({ level: 'SUCCESS', message: `Translation complete. Pool of ${translatedArticles.length} articles is ready.` });
+
+
         // --- PHASE 2: SINGLE AI ANALYSIS ---
-        log({ level: 'INFO', message: `Sending article pool of ${allArticles.length} articles to AI for selection and analysis...` });
+        log({ level: 'INFO', message: `Sending article pool of ${translatedArticles.length} articles to AI for selection and analysis...` });
         updateTaskStatusForAll(TaskStatus.PROCESSING);
 
-        const analyzedResults: SelectedArticleAnalysis[] = await selectAndAnalyzeSixBestArticles(allArticles);
+        const analyzedResults: SelectedArticleAnalysis[] = await selectAndAnalyzeSixBestArticles(translatedArticles);
         log({ level: 'SUCCESS', message: `AI has selected and analyzed ${analyzedResults.length} articles.` });
         
         // --- PHASE 3: PROCESS RESULTS ---
@@ -100,7 +102,7 @@ const App: React.FC = () => {
         const processedTaskIds = new Set<string>();
 
         for (const analyzed of analyzedResults) {
-            const originalArticle = allArticles[analyzed.originalArticleId];
+            const originalArticle = translatedArticles[analyzed.originalArticleId];
             if (!originalArticle) {
                 log({ level: 'ERROR', message: `AI returned an invalid article ID: ${analyzed.originalArticleId}` });
                 continue;

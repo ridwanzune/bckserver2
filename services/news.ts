@@ -1,10 +1,11 @@
-import { APITUBE_API_KEY, NEWSAPI_ORG_KEY } from '../components/utils/constants';
+
+import { APITUBE_API_KEY, NEWSAPI_ORG_KEY, NEWS_TOPICS } from '../components/utils/constants';
 import type { NewsDataArticle } from '../types';
 
 // --- Interfaces for APITube.io (Primary Source) ---
 interface ApiTubeArticle {
   title: string; url: string; published_at: string; summary: string | null; content: string | null;
-  image: { url: string | null; } | null; source: { name: string; };
+  image: { url: string | null; } | null; source: { name:string; };
 }
 
 // --- Interfaces for NewsAPI.org (Fallback Source) ---
@@ -13,7 +14,7 @@ interface NewsApiArticle {
   urlToImage: string | null; description: string | null; content: string | null;
 }
 
-// --- Helper to get date for API filtering ---
+// --- Helper to get date for API filtering (still used by APITube) ---
 const getTwoDaysAgoDateString = (): string => {
     const date = new Date();
     date.setDate(date.getDate() - 2);
@@ -41,96 +42,71 @@ const mapNewsApiToNewsDataArticle = (articles: NewsApiArticle[]): NewsDataArticl
 
 // --- Fetching Logic for Each Service using a more reliable proxy and headers ---
 
-const fetchFromApiTube = async (categoryType: string): Promise<NewsDataArticle[]> => {
+const fetchFromApiTube = async (topic: typeof NEWS_TOPICS[0]): Promise<NewsDataArticle[]> => {
   const PROXY_PREFIX = 'https://corsproxy.io/?';
   const BASE_URL = 'https://api.apitube.io/v1/news/everything';
   const twoDaysAgo = getTwoDaysAgoDateString();
   
+  // Use the new dynamic language property from the topic config.
+  const { q, limit, lang } = topic.apitube;
   const params = new URLSearchParams({
-      'limit': '10',
-      'language.code': 'en',
-      'published_at.after': twoDaysAgo,
+      'api_key': APITUBE_API_KEY,
+      'limit': limit,
+      'language': lang || 'en', // Use configured language, fallback to 'en'
+      'from': twoDaysAgo,
+      'q': q,
   });
-
-  switch (categoryType) {
-    case 'bangladesh':
-        // For Bangladesh news, specify the region code 'BD' for accurate geographic filtering.
-        // The query 'q' is kept to ensure the topic is still relevant.
-        params.set('q', 'Bangladesh');
-        params.set('region.code', 'BD');
-        break;
-    case 'world':
-        params.set('q', 'world news');
-        break;
-    case 'geopolitics':
-        params.set('q', 'geopolitics OR international relations');
-        break;
-    default:
-        return [];
-  }
   
   const targetUrl = `${BASE_URL}?${params.toString()}`;
   const finalUrl = `${PROXY_PREFIX}${encodeURIComponent(targetUrl)}`;
   
   try {
-    const response = await fetch(finalUrl, {
-      headers: { 'X-API-Key': APITUBE_API_KEY },
-    });
-
+    const response = await fetch(finalUrl);
     if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        try {
+            const errorData = await response.json();
+            const errorMessage = errorData?.error?.message || errorData?.message || JSON.stringify(errorData);
+            throw new Error(`API request failed with status ${response.status}: ${errorMessage}`);
+        } catch (e) {
+            throw new Error(`API request failed with status ${response.status} and could not parse the error response body.`);
+        }
     }
 
     const apiData = await response.json();
     
-    if (!apiData || !Array.isArray(apiData.data)) {
-        if (apiData.errors) {
-            throw new Error(`APITube API Error: ${apiData.errors[0]?.message || 'Unknown error'}`);
-        }
-        throw new Error('Unexpected format in APITube response.');
+    let articles: ApiTubeArticle[] | undefined;
+    if (apiData && Array.isArray(apiData.data)) articles = apiData.data;
+    else if (apiData && Array.isArray(apiData.results)) articles = apiData.results;
+    else if (apiData && Array.isArray(apiData.articles)) articles = apiData.articles;
+    else if (Array.isArray(apiData)) articles = apiData;
+
+    if (articles) {
+        return mapApiTubeToNewsDataArticle(articles);
     }
-    return mapApiTubeToNewsDataArticle(apiData.data);
+    
+    throw new Error(`Unexpected format in APITube response. Keys found: ${Object.keys(apiData).join(', ')}`);
+
   } catch (error) {
-    console.error(`APITube request for '${categoryType}' failed:`, error);
-    return []; // Return empty array on failure
+    console.error(`APITube request for '${topic.type}' failed:`, error);
+    return []; // Return empty array on failure to ensure process continues.
   }
 };
 
-const fetchFromNewsApi = async (categoryType: string): Promise<NewsDataArticle[]> => {
+const fetchFromNewsApi = async (topic: typeof NEWS_TOPICS[0]): Promise<NewsDataArticle[]> => {
     const PROXY_PREFIX = 'https://corsproxy.io/?';
-    const BASE_URL = 'https://newsapi.org/v2/everything';
-    const twoDaysAgo = getTwoDaysAgoDateString();
+    const { endpoint, params: topicParams } = topic.newsapi;
+    const BASE_URL = `https://newsapi.org/v2/${endpoint}`;
 
     const params = new URLSearchParams({
-        'language': 'en',
-        'pageSize': '10',
-        'from': twoDaysAgo,
+        apiKey: NEWSAPI_ORG_KEY,
+        ...topicParams
     });
-
-    switch (categoryType) {
-        case 'bangladesh':
-            // Use specific, high-quality English news domains from Bangladesh for better relevance.
-            // Using 'domains' is more effective than a broad 'q=Bangladesh' search.
-            // When 'domains' is used, 'q' is not required by NewsAPI.
-            params.set('domains', 'thedailystar.net,prothomalo.com,bdnews24.com,dhakatribune.com');
-            break;
-        case 'world':
-            params.set('q', 'world');
-            break;
-        case 'geopolitics':
-            params.set('q', 'geopolitics OR "international relations"');
-            break;
-        default:
-            return [];
-    }
 
     const targetUrl = `${BASE_URL}?${params.toString()}`;
     const finalUrl = `${PROXY_PREFIX}${encodeURIComponent(targetUrl)}`;
 
     try {
-        const response = await fetch(finalUrl, {
-            headers: { 'X-Api-Key': NEWSAPI_ORG_KEY },
-        });
+        const response = await fetch(finalUrl);
 
         if (!response.ok) {
             throw new Error(`API request failed with status ${response.status}`);
@@ -145,25 +121,24 @@ const fetchFromNewsApi = async (categoryType: string): Promise<NewsDataArticle[]
         if (!apiData || !Array.isArray(apiData.articles)) throw new Error('Unexpected format from NewsAPI.org.');
         return mapNewsApiToNewsDataArticle(apiData.articles);
     } catch (error) {
-        console.error(`NewsAPI.org request for '${categoryType}' failed:`, error);
+        console.error(`NewsAPI.org request for '${topic.type}' failed:`, error);
         return []; // Return empty array on failure
     }
 };
 
 /**
- * Fetches news from both APITube and NewsAPI for a list of categories, then
+ * Fetches news from both APITube and NewsAPI for a list of topics, then
  * combines and deduplicates them into a single large list.
- * @param categoryTypes An array of categories to fetch.
  * @returns A promise that resolves with a large, combined array of unique news articles.
  */
-export const fetchAllNewsFromSources = async (categoryTypes: string[]): Promise<NewsDataArticle[]> => {
-    console.log("Starting to fetch news from all sources...");
+export const fetchAllNewsFromSources = async (): Promise<NewsDataArticle[]> => {
+    console.log("Starting to fetch news from all sources based on defined topics...");
     const promises: Promise<NewsDataArticle[]>[] = [];
 
-    // Create all fetch promises to run in parallel
-    for (const type of categoryTypes) {
-        promises.push(fetchFromApiTube(type));
-        promises.push(fetchFromNewsApi(type));
+    // Create all fetch promises to run in parallel based on NEWS_TOPICS
+    for (const topic of NEWS_TOPICS) {
+        promises.push(fetchFromApiTube(topic));
+        promises.push(fetchFromNewsApi(topic));
     }
 
     const results = await Promise.all(promises);

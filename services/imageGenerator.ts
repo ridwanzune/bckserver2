@@ -1,13 +1,13 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 
-// In a Vite project, environment variables must be prefixed with VITE_ to be exposed to the client.
-// This key is sourced from the `VITE_IMAGEN_API_KEY` environment variable for image generation.
-// It must be set in your deployment environment (e.g., Render, Vercel) or a local .env file.
-const IMAGEN_API_KEY = import.meta.env?.VITE_IMAGEN_API_KEY;
+// The API key is sourced exclusively from the `API_KEY` environment variable.
+// This is required for the AI Studio environment and deployment.
+const IMAGEN_API_KEY = process.env.API_KEY;
 
 if (!IMAGEN_API_KEY) {
-    const errorMessage = "CRITICAL: Image Generation API key is missing. Ensure the `VITE_IMAGEN_API_KEY` environment variable is set. This can be caused by: 1) The variable not being defined in your .env file or deployment environment. 2) The app not being run through Vite, which is required to expose environment variables.";
+    const errorMessage = "CRITICAL: Image Generation API key is missing. Ensure the `API_KEY` environment variable is set.";
     console.error(errorMessage);
     throw new Error(errorMessage);
 }

@@ -1,14 +1,10 @@
 // ----------------------------------------------------------------------------------
 // DEPRECATED - This file is no longer in use.
 // ----------------------------------------------------------------------------------
-// The application now uses an environment variable to handle the Gemini API key
+// The application now uses an environment variable to handle the API key
 // for better security and to comply with deployment best practices.
 //
-// Please set the `VITE_GEMINI_API` environment variable in your `.env` file for
-// local development or in your Vercel project settings for deployment.
-//
-// Example for a local .env file:
-// VITE_GEMINI_API="your-new-gemini-api-key-here"
+// Please set the `API_KEY` environment variable in your execution environment.
 //
 // ----------------------------------------------------------------------------------
-export const GEMINI_API_KEY = 'THIS_IS_DEPRECATED_USE_VITE_GEMINI_API_ENV_VAR';
+export const GEMINI_API_KEY = 'THIS_IS_DEPRECATED_USE_API_KEY_ENV_VAR';
