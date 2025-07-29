@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { selectAndAnalyzeSixBestArticles, translateArticlesToEnglish } from './components/utils/services/gemini';
@@ -258,6 +257,7 @@ const App: React.FC = () => {
             </p>
             <div className="mt-8 text-center">
               <button
+                id="start-automation-btn"
                 onClick={handleStartAutomation}
                 disabled={isProcessing}
                 className="bg-pink-500 text-white font-bold px-10 py-4 rounded-lg border-4 border-black neo-shadow-sm btn-neo disabled:bg-gray-500 disabled:cursor-not-allowed disabled:text-gray-300 transition-all duration-300 text-xl"
