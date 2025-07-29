@@ -1,20 +1,30 @@
 
 
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import type { SelectedArticleAnalysis, NewsDataArticle } from '../../../types';
 
 // The API key is sourced exclusively from the `API_KEY` environment variable.
 // This is required for the AI Studio environment and deployment.
-const GEMINI_API_KEY = process.env.API_KEY;
 
-if (!GEMINI_API_KEY) {
-    const errorMessage = "CRITICAL: Gemini API key is missing. Ensure the `API_KEY` environment variable is set.";
-    console.error(errorMessage);
-    throw new Error(errorMessage);
-}
+/**
+ * Lazily initializes and returns a GoogleGenAI client instance.
+ * This prevents the app from crashing on load if the API key is not set.
+ * @returns {GoogleGenAI} An instance of the GoogleGenAI client.
+ */
+const getAiClient = () => {
+    // Prioritize environment variable, then fall back to session storage (for E2E tests).
+    const apiKey = process.env.API_KEY || (typeof window !== 'undefined' ? sessionStorage.getItem('GEMINI_API_KEY') : null);
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    if (!apiKey) {
+        const errorMessage = "CRITICAL: Gemini API key is missing. Set `API_KEY` env var or provide it via 'apiKey' URL param for tests.";
+        console.error(errorMessage);
+        throw new Error(errorMessage);
+    }
+    return new GoogleGenAI({ apiKey });
+};
+
 
 // A schema for the AI to return translated article content.
 const translationSchema = {
@@ -108,6 +118,7 @@ Return a JSON array that strictly adheres to the provided schema. Each object mu
 `;
 
     try {
+        const ai = getAiClient();
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -202,6 +213,7 @@ Return a JSON array containing exactly 6 objects for each article you selected a
 `;
 
     try {
+        const ai = getAiClient();
         const response = await ai.models.generateContent({
             model,
             contents: prompt,

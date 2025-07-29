@@ -28,12 +28,33 @@ const App: React.FC = () => {
   }, [isProcessing]);
 
   useEffect(() => {
-    // This effect runs once on mount to check for URL-based authentication.
-    if (!isAuthenticated && typeof window !== 'undefined' && APP_PASSWORD) {
+    // This effect runs once on mount to handle URL parameters for auth and configuration.
+    if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('password') === APP_PASSWORD) {
-            console.log('Authenticated via URL parameter.');
-            setIsAuthenticated(true);
+        let needsUrlUpdate = false;
+
+        // Check for and store API key from URL.
+        const apiKeyFromUrl = urlParams.get('apiKey');
+        if (apiKeyFromUrl) {
+            console.log("API key found in URL, storing in session storage.");
+            sessionStorage.setItem('GEMINI_API_KEY', apiKeyFromUrl);
+            urlParams.delete('apiKey');
+            needsUrlUpdate = true;
+        }
+        
+        // Check for URL-based authentication.
+        if (!isAuthenticated && APP_PASSWORD) {
+            if (urlParams.get('password') === APP_PASSWORD) {
+                console.log('Authenticated via URL parameter.');
+                setIsAuthenticated(true);
+            }
+        }
+        
+        // If we removed sensitive params, clean them from the URL bar.
+        if (needsUrlUpdate) {
+            const newSearch = urlParams.toString();
+            const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+            window.history.replaceState({}, document.title, newUrl);
         }
     }
   }, [isAuthenticated]);

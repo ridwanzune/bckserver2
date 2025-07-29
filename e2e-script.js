@@ -3,6 +3,7 @@ import puppeteer from 'puppeteer';
 
 const APP_URL = process.env.APP_URL;
 const APP_PASSWORD = process.env.APP_PASSWORD;
+const API_KEY = process.env.API_KEY;
 const WEBHOOK_URL = 'https://hook.eu2.make.com/0ui64t2di3wvvg00fih0d32qp9i9jgme';
 
 async function sendStatus(level, message = '', details = {}) {
@@ -31,6 +32,12 @@ async function sendStatus(level, message = '', details = {}) {
     process.exit(1);
   }
 
+  if (!API_KEY) {
+    console.error('API_KEY environment variable is missing.');
+    await sendStatus('ERROR', 'Missing required API_KEY environment variable for E2E test.');
+    process.exit(1);
+  }
+
   console.log('Launching browser...');
   const browser = await puppeteer.launch({
     headless: true,
@@ -39,8 +46,11 @@ async function sendStatus(level, message = '', details = {}) {
   const page = await browser.newPage();
 
   try {
-    console.log(`Navigating to ${APP_URL} ...`);
-    await page.goto(APP_URL, { waitUntil: 'networkidle0' });
+    const targetUrl = new URL(APP_URL);
+    targetUrl.searchParams.set('apiKey', API_KEY);
+
+    console.log(`Navigating to test URL...`);
+    await page.goto(targetUrl.toString(), { waitUntil: 'networkidle0' });
 
     console.log('Entering password...');
     await page.waitForSelector('input[type="password"]', { timeout: 30000 });
