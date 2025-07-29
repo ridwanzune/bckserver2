@@ -38,6 +38,15 @@ async function sendStatus(level, message = '', details = {}) {
   });
   const page = await browser.newPage();
 
+  // --- Enhancement: Set a realistic User-Agent to avoid being blocked ---
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36');
+
+  // --- Enhancement: Capture console logs for better debugging ---
+  page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+  page.on('pageerror', error => {
+    console.log(`PAGE ERROR: ${error.message}`);
+  });
+
   try {
     // --- Step 1: Navigate to the main page and log in ---
     console.log(`Navigating to the main page: ${APP_URL}`);
@@ -60,12 +69,16 @@ async function sendStatus(level, message = '', details = {}) {
     console.log('Clicking START AUTOMATION button...');
     await page.click(`xpath/${startBtnXPath}`);
 
-    // --- Step 3: Wait for the automation to complete ---
-    const processingBtnXPath = "//button[contains(., 'AUTOMATION') or contains(., 'PROCESSING')]";
-    console.log('Automation started. Waiting for completion...');
-    
-    // Wait for the button to become enabled again, which signifies completion.
-    await page.waitForSelector(`xpath/${processingBtnXPath}[not(@disabled)]`, { timeout: 900000 }); // 15 minute timeout
+    // --- Step 3: Wait for the automation to complete (Robust Two-Step Wait) ---
+    // First, wait for the process to START (button becomes disabled and says 'PROCESSING')
+    const disabledBtnXPath = "//button[contains(., 'PROCESSING')][@disabled]";
+    console.log('Automation triggered. Waiting for processing to begin...');
+    await page.waitForSelector(`xpath/${disabledBtnXPath}`, { timeout: 15000 }); // Wait up to 15s for processing to start
+
+    // Second, wait for the process to FINISH (button becomes enabled again with text 'AUTOMATION')
+    const enabledBtnXPath = "//button[contains(., 'AUTOMATION')][not(@disabled)]";
+    console.log('Processing has begun. Waiting for completion (this may take up to 15 minutes)...');
+    await page.waitForSelector(`xpath/${enabledBtnXPath}`, { timeout: 900000 }); // 15 minute timeout
 
     console.log('Automation process has completed.');
     
@@ -81,7 +94,20 @@ async function sendStatus(level, message = '', details = {}) {
       await sendStatus('SUCCESS', 'Batch completed successfully.');
     } else {
       console.log('Detected that no tasks completed successfully.');
-      await sendStatus('ERROR', 'Batch completed with no successful content.');
+      
+      // --- Enhancement: Extract specific error messages from the UI ---
+      const errorDetails = await page.evaluate(() => {
+        const errors = [];
+        const errorTasks = document.querySelectorAll('[data-status="Error"]');
+        errorTasks.forEach(task => {
+          const categoryName = task.querySelector('p.font-black')?.textContent || 'Unknown Category';
+          const errorMessage = task.querySelector('p.font-bold.text-white')?.textContent || 'No specific error message found.';
+          errors.push({ category: categoryName, error: errorMessage });
+        });
+        return errors;
+      });
+
+      await sendStatus('ERROR', 'Batch completed with no successful content.', { failedTasks: errorDetails });
     }
 
   } catch (err) {
