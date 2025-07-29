@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import type { LogEntry } from '../types';
+import type { LogEntry } from '../../types';
 
 const getLogLevelClass = (level: LogEntry['level']) => {
     switch (level) {

@@ -1,5 +1,3 @@
-
-
 import { APITUBE_API_KEY, NEWSAPI_ORG_KEY } from '../components/utils/constants';
 import type { NewsDataArticle } from '../types';
 
@@ -45,22 +43,34 @@ const mapNewsApiToNewsDataArticle = (articles: NewsApiArticle[]): NewsDataArticl
 
 const fetchFromApiTube = async (categoryType: string): Promise<NewsDataArticle[]> => {
   const PROXY_PREFIX = 'https://corsproxy.io/?';
-  const BASE_URL = 'https://api.apitube.io/v1/news/';
-  let queryParams = '';
+  const BASE_URL = 'https://api.apitube.io/v1/news/everything';
   const twoDaysAgo = getTwoDaysAgoDateString();
-  const commonParams = `limit=10&language.code=en&published_at.after=${twoDaysAgo}`;
+  
+  const params = new URLSearchParams({
+      'limit': '10',
+      'language.code': 'en',
+      'published_at.after': twoDaysAgo,
+  });
 
   switch (categoryType) {
-    // FIX: Use 'q=Bangladesh' which is a valid parameter, instead of the unsupported 'countries=BD'
-    // for the 'everything' endpoint, which was causing a 400 Bad Request error.
-    case 'bangladesh': queryParams = `everything?q=Bangladesh&${commonParams}`; break;
-    case 'world': queryParams = `everything?q=world%20news&${commonParams}`; break;
-    case 'geopolitics': queryParams = `everything?q=geopolitics%20OR%20international%20relations&${commonParams}`; break;
-    default: return [];
+    case 'bangladesh':
+        // For Bangladesh news, specify the region code 'BD' for accurate geographic filtering.
+        // The query 'q' is kept to ensure the topic is still relevant.
+        params.set('q', 'Bangladesh');
+        params.set('region.code', 'BD');
+        break;
+    case 'world':
+        params.set('q', 'world news');
+        break;
+    case 'geopolitics':
+        params.set('q', 'geopolitics OR international relations');
+        break;
+    default:
+        return [];
   }
   
-  const encodedTargetUrl = encodeURIComponent(`${BASE_URL}${queryParams}`);
-  const finalUrl = `${PROXY_PREFIX}${encodedTargetUrl}`;
+  const targetUrl = `${BASE_URL}?${params.toString()}`;
+  const finalUrl = `${PROXY_PREFIX}${encodeURIComponent(targetUrl)}`;
   
   try {
     const response = await fetch(finalUrl, {
@@ -89,19 +99,33 @@ const fetchFromApiTube = async (categoryType: string): Promise<NewsDataArticle[]
 const fetchFromNewsApi = async (categoryType: string): Promise<NewsDataArticle[]> => {
     const PROXY_PREFIX = 'https://corsproxy.io/?';
     const BASE_URL = 'https://newsapi.org/v2/everything';
-    let q = '';
     const twoDaysAgo = getTwoDaysAgoDateString();
 
+    const params = new URLSearchParams({
+        'language': 'en',
+        'pageSize': '10',
+        'from': twoDaysAgo,
+    });
+
     switch (categoryType) {
-        case 'bangladesh': q = 'Bangladesh'; break;
-        case 'world': q = 'world'; break;
-        case 'geopolitics': q = 'geopolitics OR "international relations"'; break;
-        default: return [];
+        case 'bangladesh':
+            // Use specific, high-quality English news domains from Bangladesh for better relevance.
+            // Using 'domains' is more effective than a broad 'q=Bangladesh' search.
+            // When 'domains' is used, 'q' is not required by NewsAPI.
+            params.set('domains', 'thedailystar.net,prothomalo.com,bdnews24.com,dhakatribune.com');
+            break;
+        case 'world':
+            params.set('q', 'world');
+            break;
+        case 'geopolitics':
+            params.set('q', 'geopolitics OR "international relations"');
+            break;
+        default:
+            return [];
     }
-    
-    const queryParams = `q=${encodeURIComponent(q)}&language=en&pageSize=10&from=${twoDaysAgo}`;
-    const encodedTargetUrl = encodeURIComponent(`${BASE_URL}?${queryParams}`);
-    const finalUrl = `${PROXY_PREFIX}${encodedTargetUrl}`;
+
+    const targetUrl = `${BASE_URL}?${params.toString()}`;
+    const finalUrl = `${PROXY_PREFIX}${encodeURIComponent(targetUrl)}`;
 
     try {
         const response = await fetch(finalUrl, {

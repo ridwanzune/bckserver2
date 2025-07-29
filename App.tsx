@@ -6,7 +6,7 @@ import { fetchAllNewsFromSources } from './services/news';
 import { composeImage, loadImage } from './components/utils/canvas';
 import { LOGO_URL, BRAND_TEXT, OVERLAY_IMAGE_URL, NEWS_CATEGORIES, APP_PASSWORD } from './components/utils/constants';
 import { BatchTask, TaskStatus, WebhookPayload, LogEntry, TaskResult, SelectedArticleAnalysis } from './types';
-import { uploadToCloudinary } from './services/cloudinary';
+import { uploadToCloudinary } from './cloudinary';
 import { sendToMakeWebhook, sendStatusUpdate, sendFinalBundle } from './services/webhook';
 import { BatchStatusDisplay } from './components/BatchStatusDisplay';
 import { generateImageFromPrompt } from './services/imageGenerator';
